@@ -1,37 +1,38 @@
 # py-get-yt-sound
 
-Небольшой CLI-инструмент поверх `yt-dlp` для скачивания звуковой дорожки.
-Для преобразования аудио требуется установленный `ffmpeg`.
+A small CLI tool built on top of `yt-dlp` for downloading audio tracks.
+Audio conversion requires `ffmpeg` to be installed.
 
-## Установка
+## Installation
 
-Все команды выполняются в виртуальном окружении:
+Run all commands in a virtual environment:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e .
 ```
 
-## Использование
+## Usage
 
-Скачать звук в MP3 в каталог `downloads`:
+Download audio as MP3 into the `downloads` directory:
 
 ```bash
 .venv/bin/yt-sound "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
-Выбрать формат и каталог:
+Choose an audio format and output directory:
 
 ```bash
 .venv/bin/yt-sound --audio-format m4a --output-dir audio "URL"
 ```
 
-По умолчанию скачивается только один ролик. Для плейлиста добавьте `--playlist`.
+By default, only one video is downloaded. Add `--playlist` to download a playlist.
 
-Если аудиофайл длиннее 30 минут, рядом с оригиналом автоматически создаются части
-`*.part-001.*`, `*.part-002.*` и так далее. Инструмент ищет ближайшую паузу
-сначала в пределах 3 минут от точки разреза, затем в пределах 5 минут. Если
-подходящей паузы нет, используется точная 30-минутная отметка.
+If an audio file is longer than 30 minutes, parts named `*.part-001.*`,
+`*.part-002.*`, and so on are automatically created next to the original file.
+The tool searches for the nearest silence within 3 minutes of the split point,
+then within 5 minutes. If no suitable silence is found, it uses the exact
+30-minute mark.
 
-После каждого запуска в каталоге загрузок создается текстовый отчет
-`download-report-*.txt` с именами обработанных файлов и точками разреза.
+After each run, a `download-report-*.txt` text report is created in the download
+directory with the names of the processed files and their split points.
