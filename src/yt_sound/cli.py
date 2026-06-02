@@ -3,6 +3,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from yt_sound.audio_splitter import split_audio
+from yt_sound.report import DownloadReport
+
 
 AUDIO_FORMATS = ("mp3", "m4a", "opus", "wav", "flac")
 
@@ -60,6 +63,22 @@ def download_audio(
             }
         ],
     }
+    report = DownloadReport(output_dir)
+    processed_files: set[Path] = set()
+    video_index = 0
+
+    def process_downloaded_audio(status: dict) -> None:
+        nonlocal video_index
+        if status.get("status") != "finished" or status.get("postprocessor") != "MoveFiles":
+            return
+        file_path = Path(status["info_dict"]["filepath"])
+        if file_path in processed_files:
+            return
+        processed_files.add(file_path)
+        video_index += 1
+        report.add(video_index, split_audio(file_path))
+
+    options["postprocessor_hooks"] = [process_downloaded_audio]
 
     with yt_dlp.YoutubeDL(options) as downloader:
         downloader.download([url])
@@ -82,4 +101,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
