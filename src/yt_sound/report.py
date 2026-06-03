@@ -7,7 +7,8 @@ from yt_sound.audio_splitter import SplitResult, format_timestamp
 
 
 class DownloadReport:
-    def __init__(self, output_dir: Path) -> None:
+    def __init__(self, output_dir: Path, fragment_length_seconds: int) -> None:
+        self.fragment_length_seconds = fragment_length_seconds
         self.created_at = datetime.now().astimezone()
         filename = self.created_at.strftime("download-report-%Y%m%d-%H%M%S-%f.txt")
         self.path = output_dir / filename
@@ -27,7 +28,10 @@ class DownloadReport:
             lines.append("Части:")
             lines.extend(f"- {part.name}" for part in result.parts)
         else:
-            lines.append("Точки разреза: нет, файл не длиннее 30 минут")
+            lines.append(
+                "Точки разреза: нет, файл не длиннее "
+                f"{format_timestamp(self.fragment_length_seconds)}"
+            )
         self._write("\n".join(lines) + "\n\n")
 
     def _write(self, text: str) -> None:

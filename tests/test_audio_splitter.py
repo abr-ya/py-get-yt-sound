@@ -48,7 +48,7 @@ def test_find_split_points_keeps_parts_around_thirty_minutes(monkeypatch) -> Non
         lambda file_path, target, duration: audio_splitter.SplitPoint(target - 10, True),
     )
 
-    points = audio_splitter.find_split_points(Path("episode.mp3"), 3700.0)
+    points = audio_splitter.find_split_points(Path("episode.mp3"), 3700.0, 1800)
 
     assert points == (
         audio_splitter.SplitPoint(1790.0, True),

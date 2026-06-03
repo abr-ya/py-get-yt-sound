@@ -5,6 +5,7 @@ from pathlib import Path
 
 from yt_sound.audio_splitter import split_audio
 from yt_sound.report import DownloadReport
+from yt_sound.settings import DEFAULT_CONFIG_PATH, Settings, load_settings
 
 
 AUDIO_FORMATS = ("mp3", "m4a", "opus", "wav", "flac")
@@ -31,6 +32,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory for downloaded files (default: downloads)",
     )
     parser.add_argument(
+        "--config",
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
+        help=f"Settings file path (default: {DEFAULT_CONFIG_PATH})",
+    )
+    parser.add_argument(
         "--playlist",
         action="store_true",
         help="Allow downloading an entire playlist",
@@ -43,6 +50,7 @@ def download_audio(
     audio_format: str,
     output_dir: Path,
     allow_playlist: bool,
+    settings: Settings | None = None,
 ) -> None:
     try:
         import yt_dlp
@@ -52,18 +60,21 @@ def download_audio(
         ) from exc
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    settings = settings or Settings()
+    audio_postprocessor = {
+        "key": "FFmpegExtractAudio",
+        "preferredcodec": audio_format,
+    }
+    if audio_format == "mp3":
+        audio_postprocessor["preferredquality"] = str(settings.mp3_bitrate_kbps)
+
     options = {
         "format": "bestaudio/best",
         "noplaylist": not allow_playlist,
         "outtmpl": str(output_dir / "%(title)s [%(id)s].%(ext)s"),
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": audio_format,
-            }
-        ],
+        "postprocessors": [audio_postprocessor],
     }
-    report = DownloadReport(output_dir)
+    report = DownloadReport(output_dir, settings.fragment_length_seconds)
     processed_files: set[Path] = set()
     video_index = 0
 
@@ -76,7 +87,7 @@ def download_audio(
             return
         processed_files.add(file_path)
         video_index += 1
-        report.add(video_index, split_audio(file_path))
+        report.add(video_index, split_audio(file_path, settings.fragment_length_seconds))
 
     options["postprocessor_hooks"] = [process_downloaded_audio]
 
@@ -87,11 +98,13 @@ def download_audio(
 def main() -> int:
     args = build_parser().parse_args()
     try:
+        settings = load_settings(args.config)
         download_audio(
             url=args.url,
             audio_format=args.audio_format,
             output_dir=args.output_dir,
             allow_playlist=args.playlist,
+            settings=settings,
         )
     except RuntimeError as exc:
         print(f"error: {exc}")

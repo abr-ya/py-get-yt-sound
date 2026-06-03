@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-PART_DURATION = 30 * 60
+DEFAULT_PART_DURATION = 30 * 60
 SEARCH_WINDOWS = (3 * 60, 5 * 60)
 SILENCE_DURATION = 0.7
 SILENCE_NOISE = "-35dB"
@@ -111,19 +111,23 @@ def choose_split_point(
     return SplitPoint(seconds=target, found_in_silence=False)
 
 
-def find_split_points(file_path: Path, duration: float) -> tuple[SplitPoint, ...]:
+def find_split_points(
+    file_path: Path,
+    duration: float,
+    part_duration: int = DEFAULT_PART_DURATION,
+) -> tuple[SplitPoint, ...]:
     points = []
     previous = 0.0
-    while duration - previous > PART_DURATION:
-        point = choose_split_point(file_path, previous + PART_DURATION, duration)
+    while duration - previous > part_duration:
+        point = choose_split_point(file_path, previous + part_duration, duration)
         points.append(point)
         previous = point.seconds
     return tuple(points)
 
 
-def split_audio(file_path: Path) -> SplitResult:
+def split_audio(file_path: Path, part_duration: int = DEFAULT_PART_DURATION) -> SplitResult:
     duration = get_duration(file_path)
-    split_points = find_split_points(file_path, duration)
+    split_points = find_split_points(file_path, duration, part_duration)
     if not split_points:
         return SplitResult(file_path, duration, (), ())
 
