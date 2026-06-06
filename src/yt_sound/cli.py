@@ -87,7 +87,10 @@ def download_audio(
             return
         processed_files.add(file_path)
         video_index += 1
-        report.add(video_index, split_audio(file_path, settings.fragment_length_seconds))
+        if settings.split_audio:
+            report.add(video_index, split_audio(file_path, settings.fragment_length_seconds))
+        else:
+            report.add_without_split(video_index, file_path)
 
     options["postprocessor_hooks"] = [process_downloaded_audio]
 

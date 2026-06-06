@@ -34,6 +34,14 @@ class DownloadReport:
             )
         self._write("\n".join(lines) + "\n\n")
 
+    def add_without_split(self, index: int, file_path: Path) -> None:
+        lines = [
+            f"Видео #{index}",
+            f"Файл: {file_path.name}",
+            "Нарезка: отключена в настройках",
+        ]
+        self._write("\n".join(lines) + "\n\n")
+
     def _write(self, text: str) -> None:
         with self.path.open("a", encoding="utf-8") as report_file:
             report_file.write(text)

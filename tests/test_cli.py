@@ -129,3 +129,53 @@ def test_download_audio_processes_finished_move_files_hook(monkeypatch, tmp_path
     report = next(tmp_path.glob("download-report-*.txt")).read_text(encoding="utf-8")
     assert "Видео #1" in report
     assert "Файл: episode.mp3" in report
+
+
+def test_download_audio_can_skip_splitting(monkeypatch, tmp_path: Path) -> None:
+    received = {"split_called": False}
+    audio_file = tmp_path / "episode.mp3"
+
+    class FakeYoutubeDL:
+        def __init__(self, options):
+            self.options = options
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def download(self, urls):
+            hook = self.options["postprocessor_hooks"][0]
+            hook(
+                {
+                    "status": "finished",
+                    "postprocessor": "MoveFiles",
+                    "info_dict": {"filepath": str(audio_file)},
+                }
+            )
+
+    def fake_split_audio(file_path, part_duration):
+        received["split_called"] = True
+        return SplitResult(file_path, 60.0, (), ())
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "yt_dlp",
+        SimpleNamespace(YoutubeDL=FakeYoutubeDL),
+    )
+    monkeypatch.setattr(cli, "split_audio", fake_split_audio)
+
+    cli.download_audio(
+        "https://example.test/video",
+        "mp3",
+        tmp_path,
+        False,
+        Settings(split_audio=False),
+    )
+
+    assert received["split_called"] is False
+    report = next(tmp_path.glob("download-report-*.txt")).read_text(encoding="utf-8")
+    assert "Видео #1" in report
+    assert "Файл: episode.mp3" in report
+    assert "Нарезка: отключена в настройках" in report
