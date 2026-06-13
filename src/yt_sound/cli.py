@@ -11,6 +11,14 @@ from yt_sound.settings import DEFAULT_CONFIG_PATH, Settings, load_settings
 AUDIO_FORMATS = ("mp3", "m4a", "opus", "wav", "flac")
 
 
+def filename_stem(value: str) -> str:
+    if not value or value in {".", ".."} or "/" in value or "\\" in value:
+        raise argparse.ArgumentTypeError(
+            "filename must be a file name without a directory path"
+        )
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="yt-sound",
@@ -32,6 +40,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory for downloaded files (default: downloads)",
     )
     parser.add_argument(
+        "-n",
+        "--filename",
+        type=filename_stem,
+        help="Output file name without extension (default: video title and ID)",
+    )
+    parser.add_argument(
         "--config",
         type=Path,
         default=DEFAULT_CONFIG_PATH,
@@ -51,7 +65,11 @@ def download_audio(
     output_dir: Path,
     allow_playlist: bool,
     settings: Settings | None = None,
+    filename: str | None = None,
 ) -> None:
+    if filename and allow_playlist:
+        raise RuntimeError("--filename cannot be used with --playlist")
+
     try:
         import yt_dlp
     except ImportError as exc:
@@ -68,10 +86,15 @@ def download_audio(
     if audio_format == "mp3":
         audio_postprocessor["preferredquality"] = str(settings.mp3_bitrate_kbps)
 
+    output_name = (
+        f"{filename.replace('%', '%%')}.%(ext)s"
+        if filename
+        else "%(title)s [%(id)s].%(ext)s"
+    )
     options = {
         "format": "bestaudio/best",
         "noplaylist": not allow_playlist,
-        "outtmpl": str(output_dir / "%(title)s [%(id)s].%(ext)s"),
+        "outtmpl": str(output_dir / output_name),
         "postprocessors": [audio_postprocessor],
     }
     report = DownloadReport(output_dir, settings.fragment_length_seconds)
@@ -82,15 +105,21 @@ def download_audio(
         nonlocal video_index
         if status.get("status") != "finished" or status.get("postprocessor") != "MoveFiles":
             return
-        file_path = Path(status["info_dict"]["filepath"])
+        info = status["info_dict"]
+        file_path = Path(info["filepath"])
+        original_title = info.get("title")
         if file_path in processed_files:
             return
         processed_files.add(file_path)
         video_index += 1
         if settings.split_audio:
-            report.add(video_index, split_audio(file_path, settings.fragment_length_seconds))
+            report.add(
+                video_index,
+                split_audio(file_path, settings.fragment_length_seconds),
+                original_title,
+            )
         else:
-            report.add_without_split(video_index, file_path)
+            report.add_without_split(video_index, file_path, original_title)
 
     options["postprocessor_hooks"] = [process_downloaded_audio]
 
@@ -108,6 +137,7 @@ def main() -> int:
             output_dir=args.output_dir,
             allow_playlist=args.playlist,
             settings=settings,
+            filename=args.filename,
         )
     except RuntimeError as exc:
         print(f"error: {exc}")

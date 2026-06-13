@@ -26,6 +26,15 @@ Choose an audio format and output directory:
 .venv/bin/yt-sound --audio-format m4a --output-dir audio "URL"
 ```
 
+Choose the saved file name instead of using the video title and ID:
+
+```bash
+.venv/bin/yt-sound --filename "my-audio" "URL"
+```
+
+Pass the name without an extension. The extension is selected by
+`--audio-format`. `--filename` cannot be combined with `--playlist`.
+
 By default, only one video is downloaded. Add `--playlist` to download a playlist.
 
 Settings are read from `yt-sound.json` in the current directory by default:
@@ -51,4 +60,4 @@ then within 5 minutes. If no suitable silence is found, it uses the exact
 fragment boundary.
 
 After each run, a `download-report-*.txt` text report is created in the download
-directory with the names of the processed files and their split points.
+directory with the original video titles, saved file names, and split points.

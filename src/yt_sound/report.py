@@ -14,9 +14,10 @@ class DownloadReport:
         self.path = output_dir / filename
         self._write(f"Дата и время отчета: {self.created_at.isoformat(timespec='seconds')}\n\n")
 
-    def add(self, index: int, result: SplitResult) -> None:
+    def add(self, index: int, result: SplitResult, original_title: str | None = None) -> None:
         lines = [
             f"Видео #{index}",
+            f"Оригинальное название: {original_title or 'неизвестно'}",
             f"Файл: {result.source.name}",
             f"Длительность: {format_timestamp(result.duration)}",
         ]
@@ -34,9 +35,15 @@ class DownloadReport:
             )
         self._write("\n".join(lines) + "\n\n")
 
-    def add_without_split(self, index: int, file_path: Path) -> None:
+    def add_without_split(
+        self,
+        index: int,
+        file_path: Path,
+        original_title: str | None = None,
+    ) -> None:
         lines = [
             f"Видео #{index}",
+            f"Оригинальное название: {original_title or 'неизвестно'}",
             f"Файл: {file_path.name}",
             "Нарезка: отключена в настройках",
         ]

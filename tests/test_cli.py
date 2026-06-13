@@ -1,6 +1,8 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from yt_sound import cli
 from yt_sound.audio_splitter import SplitResult
 from yt_sound.settings import Settings
@@ -39,9 +41,64 @@ def test_download_audio_configures_yt_dlp(monkeypatch, tmp_path: Path) -> None:
     assert received["urls"] == ["https://example.test/video"]
     assert received["options"]["format"] == "bestaudio/best"
     assert received["options"]["noplaylist"] is True
+    assert received["options"]["outtmpl"] == str(
+        tmp_path / "%(title)s [%(id)s].%(ext)s"
+    )
     assert received["options"]["postprocessors"][0]["preferredcodec"] == "mp3"
     assert received["options"]["postprocessors"][0]["preferredquality"] == "256"
     assert len(received["options"]["postprocessor_hooks"]) == 1
+
+
+def test_download_audio_uses_custom_filename(monkeypatch, tmp_path: Path) -> None:
+    received = {}
+
+    class FakeYoutubeDL:
+        def __init__(self, options):
+            received["options"] = options
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def download(self, urls):
+            pass
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "yt_dlp",
+        SimpleNamespace(YoutubeDL=FakeYoutubeDL),
+    )
+
+    cli.download_audio(
+        "https://example.test/video",
+        "mp3",
+        tmp_path,
+        False,
+        filename="my 100% audio",
+    )
+
+    assert received["options"]["outtmpl"] == str(
+        tmp_path / "my 100%% audio.%(ext)s"
+    )
+
+
+def test_download_audio_rejects_custom_filename_for_playlist(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="cannot be used with --playlist"):
+        cli.download_audio(
+            "https://example.test/playlist",
+            "mp3",
+            tmp_path,
+            True,
+            filename="playlist",
+        )
+
+
+@pytest.mark.parametrize("value", ["", ".", "..", "folder/name", "folder\\name"])
+def test_filename_stem_rejects_invalid_names(value: str) -> None:
+    with pytest.raises(cli.argparse.ArgumentTypeError):
+        cli.filename_stem(value)
 
 
 def test_download_audio_does_not_set_mp3_quality_for_other_formats(
@@ -100,7 +157,10 @@ def test_download_audio_processes_finished_move_files_hook(monkeypatch, tmp_path
                 {
                     "status": "finished",
                     "postprocessor": "MoveFiles",
-                    "info_dict": {"filepath": str(audio_file)},
+                    "info_dict": {
+                        "filepath": str(audio_file),
+                        "title": "Original episode title",
+                    },
                 }
             )
 
@@ -128,6 +188,7 @@ def test_download_audio_processes_finished_move_files_hook(monkeypatch, tmp_path
     assert received["part_duration"] == 45
     report = next(tmp_path.glob("download-report-*.txt")).read_text(encoding="utf-8")
     assert "Видео #1" in report
+    assert "Оригинальное название: Original episode title" in report
     assert "Файл: episode.mp3" in report
 
 
@@ -151,7 +212,10 @@ def test_download_audio_can_skip_splitting(monkeypatch, tmp_path: Path) -> None:
                 {
                     "status": "finished",
                     "postprocessor": "MoveFiles",
-                    "info_dict": {"filepath": str(audio_file)},
+                    "info_dict": {
+                        "filepath": str(audio_file),
+                        "title": "Original episode title",
+                    },
                 }
             )
 
@@ -177,5 +241,6 @@ def test_download_audio_can_skip_splitting(monkeypatch, tmp_path: Path) -> None:
     assert received["split_called"] is False
     report = next(tmp_path.glob("download-report-*.txt")).read_text(encoding="utf-8")
     assert "Видео #1" in report
+    assert "Оригинальное название: Original episode title" in report
     assert "Файл: episode.mp3" in report
     assert "Нарезка: отключена в настройках" in report
